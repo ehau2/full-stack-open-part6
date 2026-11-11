@@ -1,55 +1,55 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-
-import {
-  getAnecdotes,
-  createAnecdote,
-  updateAnecdote
-} from '../requests'
+import { getAnecdotes, createAnecdote, updateAnecdote } from '../requests'
 
 export const useAnecdotes = () => {
+    const queryClient = useQueryClient()
 
-  const queryClient = useQueryClient()
+    const result = useQuery({
+        queryKey: ['anecdotes'],
+        queryFn: getAnecdotes,
+        refetchOnWindowFocus: false,
+        retry: false
+    })
 
-  const result = useQuery({
-    queryKey: ['anecdotes'],
-    queryFn: getAnecdotes,
-    refetchOnWindowFocus: false,
-    retry: false
-  })
+    const newAnecdoteMutation = useMutation({
+        mutationFn: createAnecdote,
+        onSuccess: (newAnecdote) => {
+            const anecdotes = queryClient.getQueryData(['anecdotes'])
+            queryClient.setQueryData(
+                ['anecdotes'],
+                anecdotes.concat(newAnecdote)
+            )
+        }
+    })
 
-  const newAnecdoteMutation = useMutation({
-    mutationFn: createAnecdote,
-    onSuccess: (newAnecdote) => {
-      const anecdotes = queryClient.getQueryData(['anecdotes'])
-      queryClient.setQueryData(
-        ['anecdotes'],
-        anecdotes.concat(newAnecdote)
-      )
+    const voteMutation = useMutation({
+        mutationFn: updateAnecdote,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['anecdotes'] })
+        }
+    })
+
+    return {
+        anecdotes: result.data,
+        isPending: result.isPending,
+        isError: result.isError,
+
+        addAnecdote: (content, callbacks) =>
+            newAnecdoteMutation.mutate(
+                {
+                    content,
+                    votes: 0
+                },
+                callbacks
+            ),
+
+        voteAnecdote: (anecdote, callbacks) =>
+            voteMutation.mutate(
+                {
+                    ...anecdote,
+                    votes: anecdote.votes + 1
+                },
+                callbacks
+            )
     }
-  })
-
-  const voteMutation = useMutation({
-    mutationFn: updateAnecdote,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['anecdotes'] })
-    }
-  })
-
-  return {
-    anecdotes: result.data,
-    isPending: result.isPending,
-    isError: result.isError,
-
-    addAnecdote: (content) =>
-      newAnecdoteMutation.mutate({
-        content,
-        votes: 0
-      }),
-
-    voteAnecdote: (anecdote) =>
-      voteMutation.mutate({
-        ...anecdote,
-        votes: anecdote.votes + 1
-      })
-  }
 }
